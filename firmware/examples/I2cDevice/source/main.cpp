@@ -8,33 +8,38 @@
 constexpr uint8_t kAccelerometerAddress = 0x1C;
 constexpr uint8_t kGestureAddress       = 0x39;
 
-template <WriteFnt write, ReadFnt read>
+template <device::Endian endianess, WriteFnt write, ReadFnt read>
 SJ2_PACKED(struct)
 AccelerometerMemoryMap_t  // MMA8452Q
 {
   template <typename Int>
-  using Register = device::Register_t<Int, write, read>;
+  using Register = device::Register_t<Int, endianess, write, read>;
+
+  template <typename Int, size_t kLength>
+  using Array = device::Array_t<Int, kLength, write, read>;
 
   Register<uint8_t> status;
-  Register<uint16_t> x;
-  Register<uint16_t> y;
-  Register<uint16_t> z;
+  // Register<uint16_t> x;
+  // Register<uint16_t> y;
+  // Register<uint16_t> z;
+  Array<uint8_t, 6> xyz;
   device::Reserved_t<0x04> reserved0;
   Register<uint8_t> sysmod;
   Register<uint8_t> int_source;
   Register<uint8_t> who_am_i;
   device::Reserved_t<0x1C> reserved1;
-  Register<uint8_t> control1;
-  Register<uint8_t> control2;
-  Register<uint8_t> control3;
+  // Register<uint8_t> control1;
+  // Register<uint8_t> control2;
+  // Register<uint8_t> control3;
+  Array<uint8_t, 3> control;
 };
 
-template <WriteFnt write, ReadFnt read>
+template <device::Endian endianess, WriteFnt write, ReadFnt read>
 SJ2_PACKED(struct)
 GestureMemoryMap_t  // APDS-9960
 {
   template <typename Int>
-  using Register = device::Register_t<Int, write, read>;
+  using Register = device::Register_t<Int, endianess, write, read>;
 
   device::Reserved_t<0x80> ram;
   Register<uint8_t> enable;
@@ -44,8 +49,7 @@ GestureMemoryMap_t  // APDS-9960
 I2c i2c;
 
 I2cDevice<&i2c, kAccelerometerAddress, device::Endian::kBig,
-          AccelerometerMemoryMap_t>
-    accelerometer;
+          AccelerometerMemoryMap_t> accelerometer;
 
 I2cDevice<&i2c, kGestureAddress, device::Endian::kLittle, GestureMemoryMap_t>
     gesture;
@@ -56,7 +60,7 @@ int main(void)
   DEBUG_PRINT("Initializing I2C Port 2...");
   i2c.Initialize();
   DEBUG_PRINT("Initializing Onboard Accelerometer using I2C.2...");
-  accelerometer.memory.control1       = 1;
+  accelerometer.memory.control[0]     = 1;
   gesture.memory.adc_integration_time = 0;
 
   while (true)
@@ -67,10 +71,13 @@ int main(void)
     uint8_t who_am_i = accelerometer.memory.who_am_i;
     DEBUG_PRINT("WHO_AM_I 0x%02X", who_am_i);
 
-    uint16_t x = accelerometer.memory.x;
-    uint16_t y = accelerometer.memory.y;
-    uint16_t z = accelerometer.memory.z;
-    DEBUG_PRINT("x = %d :: y = %d :: z = %d", x, y, z);
+    // uint16_t x = accelerometer.memory.x;
+    // uint16_t y = accelerometer.memory.y;
+    // uint16_t z = accelerometer.memory.z;
+    // DEBUG_PRINT("x = %d :: y = %d :: z = %d", x, y, z);
+
+    std::array<uint8_t, 6> xyz = accelerometer.memory.xyz;
+    DEBUG_PRINT("x = 0x%02X%02X", xyz[0], xyz[1]);
 
     uint8_t reg1;
     reg1 = gesture.memory.adc_integration_time;
@@ -89,7 +96,7 @@ int main(void)
     DEBUG_PRINT("add reg1 = 0x%02X", reg1);
     DEBUG_PRINT("========================\n");
 
-    Delay(2000);
+    Delay(500);
   }
   return 0;
 }
